@@ -1,5 +1,5 @@
 <?php
-namespace denkorolkov\ajaxcrud;
+namespace errohitsinghal\ajaxcrud;
 
 use yii\base\Widget;
 use yii\bootstrap5\Html;
