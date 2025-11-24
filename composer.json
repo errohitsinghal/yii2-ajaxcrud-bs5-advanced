@@ -31,11 +31,11 @@
     },
     "autoload": {
         "psr-4": {
-            "denkorolkov\\ajaxcrud\\": "src/"
+            "errohitsinghal\\ajaxcrud\\": "src/"
         }
     },
     "extra": {
-        "bootstrap": "denkorolkov\\ajaxcrud\\Bootstrap",
+        "bootstrap": "errohitsinghal\\ajaxcrud\\Bootstrap",
         "branch-alias": {
             "dev-master": "2.0.x-dev"
         }
