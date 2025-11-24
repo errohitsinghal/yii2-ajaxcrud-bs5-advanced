@@ -15,7 +15,7 @@ class BulkButtonWidget extends Widget{
 	}
 
 	public function run(){
-		$content = '<div class="float-left">'.
+		$content = '<div class="float-start">'.
                    $this->buttonText.
                    $this->buttons.
                    '</div>';

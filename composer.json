@@ -1,19 +1,24 @@
 {
-    "name": "denkorolkov/yii2-ajaxcrud-bs5",
-    "description": "Gii CRUD template for Single Page Ajax Administration for yii2",
+    "name": "errohitsinghal/yii2-ajaxcrud-bs5-advanced",
+    "description": "Gii CRUD template with password validation modal for Single Page Ajax Administration for yii2 with Bootstrap 5 support",
     "type": "yii2-extension",
-    "keywords": ["yii2","extension","ajax","crud","gii","template","database"],
+    "keywords": ["yii2","extension","ajax","crud","gii","template","database","modal","password-validation"],
     "license": "Apache-2.0",
     "authors": [
         {
             "name": "Denis Korolkov",
             "email": "right.ked@gmail.com",
             "homepage": "https://github.com/denkorolkov?tab=repositories"
+        },
+        {
+            "name": "Rohit Singhal",
+            "email": "errohitsinghal@gmail.com",
+            "homepage": "https://github.com/errohitsinghal"
         }
     ],
     "support": {
-        "issues": "https://github.com/denkorolkov/yii2-ajaxcrud-bs5/issues?state=open",
-        "source": "https://github.com/denkorolkov/yii2-ajaxcrud-bs5"
+        "issues": "https://github.com/errohitsinghal/yii2-ajaxcrud-bs5-advanced/issues?state=open",
+        "source": "https://github.com/errohitsinghal/yii2-ajaxcrud-bs5-advanced"
     },
     "require": {
         "yiisoft/yii2": "*",
@@ -30,6 +35,9 @@
         }
     },
     "extra": {
-        "bootstrap": "denkorolkov\\ajaxcrud\\Bootstrap"
+        "bootstrap": "denkorolkov\\ajaxcrud\\Bootstrap",
+        "branch-alias": {
+            "dev-master": "2.0.x-dev"
+        }
     }
 }
