@@ -21,14 +21,6 @@
         "source": "https://github.com/errohitsinghal/yii2-ajaxcrud-bs5-advanced"
     },
     "require": {
-        "php": ">=7.4",
-        "yiisoft/yii2": "^2.0.14",
-        "yiisoft/yii2-gii": "~2.1.0",
-        "yiisoft/yii2-bootstrap5": "^2.0",
-        "kartik-v/yii2-grid": "^3.5",
-        "kartik-v/yii2-mpdf": "^1.0",
-        "kartik-v/yii2-editable": "^1.7",
-        "kartik-v/yii2-detail-view": "^1.8"
     },
     "autoload": {
         "psr-4": {
