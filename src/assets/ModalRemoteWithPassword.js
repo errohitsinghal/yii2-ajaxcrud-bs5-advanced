@@ -235,6 +235,14 @@ function ModalRemote(modalId) {
             }
         }
 
+        if(response.toasts !== undefined){
+            if (Array.isArray(response.toasts)) {
+                response.toasts.forEach(function(toast){
+                    showToast(toast.message, toast.type);
+                }, this);
+            }
+        }
+        
         // Close modal if response contains forceClose field
         if (response.forceClose !== undefined && response.forceClose) {
             this.hide();
@@ -246,14 +254,6 @@ function ModalRemote(modalId) {
 
         if (response.title !== undefined)
             this.setTitle(response.title);
-
-        if(response.toasts !== undefined){
-            if (Array.isArray(response.toasts)) {
-                response.toasts.forEach(function(toast){
-                    showToast(toast.message, toast.type);
-                }, this);
-            }
-        }
 
         if (response.content !== undefined)
             this.setContent(response.content);
