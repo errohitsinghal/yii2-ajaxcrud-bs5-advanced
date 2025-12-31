@@ -235,14 +235,51 @@ function ModalRemote(modalId) {
             }
         }
 
-        if(response.toasts !== undefined){
+       if(response.toasts !== undefined){
             if (Array.isArray(response.toasts)) {
                 response.toasts.forEach(function(toast){
-                    showToast(toast.message, toast.type);
+                    // Use Bootstrap 5 native toast
+                    var bgClass = {
+                        'info': 'bg-info',
+                        'success': 'bg-success', 
+                        'warning': 'bg-warning',
+                        'danger': 'bg-danger',
+                        'error': 'bg-danger'
+                    }[toast.type] || 'bg-info';
+                    
+                    var textClass = (toast.type === 'warning') ? 'text-dark' : 'text-white';
+                    
+                    // Create toast container if it doesn't exist
+                    var container = document.getElementById('toast-container');
+                    if (!container) {
+                        container = document.createElement('div');
+                        container.id = 'toast-container';
+                        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                        container.style.zIndex = '99999999';
+                        document.body.appendChild(container);
+                    }
+                    
+                    var toastId = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                    var toastHtml = '<div id="' + toastId + '" class="toast align-items-center ' + bgClass + ' ' + textClass + ' border-0" role="alert" aria-live="assertive" aria-atomic="true">' +
+                        '<div class="d-flex">' +
+                            '<div class="toast-body">' + toast.message + '</div>' +
+                            '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>' +
+                        '</div>' +
+                    '</div>';
+                    
+                    container.insertAdjacentHTML('beforeend', toastHtml);
+                    
+                    var toastElement = document.getElementById(toastId);
+                    var bsToast = new bootstrap.Toast(toastElement, { delay: 5000 });
+                    bsToast.show();
+                    
+                    toastElement.addEventListener('hidden.bs.toast', function() {
+                        toastElement.remove();
+                    });
                 }, this);
             }
         }
-        
+                
         // Close modal if response contains forceClose field
         if (response.forceClose !== undefined && response.forceClose) {
             this.hide();
