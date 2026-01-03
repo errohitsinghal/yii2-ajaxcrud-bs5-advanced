@@ -55,4 +55,14 @@ $(document).ready(function () {
             modal.open(this, selectedIds);
         }
     });
+
+    // Handle Pjax refresh on modal close
+    // Listen for hide event on modal to check for data-pjax-refresh attribute
+    $(document).on('hide.bs.modal', '.modal', function() {
+        // Check if any button in the modal has data-pjax-refresh attribute
+        var pjaxRefreshId = $(this).find('[data-pjax-refresh]').data('pjax-refresh');
+        if (pjaxRefreshId && typeof $.pjax !== 'undefined') {
+            $.pjax.reload({container: '#' + pjaxRefreshId});
+        }
+    });
 });

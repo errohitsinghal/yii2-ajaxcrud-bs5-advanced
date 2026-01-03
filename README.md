@@ -117,6 +117,33 @@ echo Html::a('Delete', ['delete', 'id' => $model->id], [
 - `href` or `data-url`: Target URL for the action
 
 
+Pjax Refresh on Modal Close
+---------
+This extension supports automatic Pjax container refresh when a modal is closed. This is useful when you want to refresh a grid or other Pjax-wrapped content after a modal action is completed.
+
+### Usage
+
+Add the `data-pjax-refresh` attribute to any button in your modal footer with the Pjax container ID as the value:
+
+```php
+<?php
+// In your controller action that returns modal content
+return [
+    'title' => '<i class="fa fa-sort-amount-down me-2"></i>Seeding: ' . Html::encode($eventStage->stage_name),
+    'size' => 'large',
+    'content' => $this->renderAjax($view, $viewParams),
+    'footer' => Html::button('Close', [
+        'class' => 'btn btn-secondary',
+        'data-bs-dismiss' => 'modal',
+        'data-pjax-refresh' => $pjaxId  // The ID of your Pjax container (without #)
+    ]),
+];
+?>
+```
+
+When the modal is closed (either by clicking the Close button or any other dismiss action), the Pjax container with the specified ID will automatically be refreshed.
+
+
 Bootstrap 5 Classes
 ---------
 This extension fully supports Bootstrap 5 CSS classes including:
