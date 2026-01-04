@@ -62,7 +62,7 @@ $(document).ready(function () {
         // Check if any button in the modal has data-pjax-refresh attribute
         var pjaxRefreshId = $(this).find('[data-pjax-refresh]').data('pjax-refresh');
         if (pjaxRefreshId && typeof $.pjax !== 'undefined') {
-            $.pjax.reload({container: '#' + pjaxRefreshId});
+            $.pjax.reload({container: '#' + pjaxRefreshId, timeout: 2000});
         }
     });
 });
