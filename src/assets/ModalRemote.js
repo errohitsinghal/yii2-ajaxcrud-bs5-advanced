@@ -220,9 +220,9 @@ function ModalRemote(modalId) {
             if (response.forceReload !== undefined && response.forceReload) {
                 if (response.forceReload == 'true') {
                     // Backwards compatible reload of fixed crud-datatable-pjax
-                    $.pjax.reload({container: '#crud-datatable-pjax'});
+                    $.pjax.reload({container: '#crud-datatable-pjax', timeout: 2000});
                 } else {
-                    $.pjax.reload({container: response.forceReload});
+                    $.pjax.reload({container: response.forceReload, timeout: 2000});
                 }
             }
         }
