@@ -128,3 +128,72 @@ describe('ModalStack level mapping', () => {
     expect(stack.targetLevelFor(document.getElementById('f0'))).toBe(0);
   });
 });
+
+describe('ModalStack container lifecycle', () => {
+  let ModalStack;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = '<div class="modal" id="ajaxCrudModal"><div class="modal-content">' +
+      '<div class="modal-header"></div><div class="modal-body"></div><div class="modal-footer"></div>' +
+      '</div></div>';
+  });
+
+  it('builds a container with the regions ModalRemote caches', () => {
+    document.body.insertAdjacentHTML('beforeend', ModalStack.containerHtml(2));
+    const el = document.getElementById('ajaxCrudModal-L2');
+    expect(el).not.toBeNull();
+    expect(el.querySelector('.modal-dialog')).not.toBeNull();
+    expect(el.querySelector('.modal-header')).not.toBeNull();
+    expect(el.querySelector('.modal-body')).not.toBeNull();
+    expect(el.querySelector('.modal-footer')).not.toBeNull();
+  });
+
+  it('gives each created container its level z-index', () => {
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(1);
+    expect(jQuery('#ajaxCrudModal-L1').css('z-index')).toBe(String(ModalStack.modalZIndex(1)));
+  });
+
+  it('appends created containers to body, not inside another modal', () => {
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(1);
+    expect(document.getElementById('ajaxCrudModal-L1').parentElement).toBe(document.body);
+  });
+
+  it('reuses the layout container for level 0 rather than creating one', () => {
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(0);
+    expect(stack.levels[0].$el[0]).toBe(document.getElementById('ajaxCrudModal'));
+    expect(document.getElementById('ajaxCrudModal-L0')).toBeNull();
+  });
+
+  it('creates level 0 when the layout has no container', () => {
+    document.body.innerHTML = '';
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(0);
+    expect(document.getElementById('ajaxCrudModal-L0')).not.toBeNull();
+  });
+
+  it('fills intermediate levels so the array stays dense', () => {
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(2);
+    expect(stack.levels.length).toBe(3);
+  });
+
+  it('truncateAbove destroys deeper levels and removes their DOM', () => {
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(2);
+    stack.truncateAbove(0);
+    expect(stack.levels.length).toBe(1);
+    expect(document.getElementById('ajaxCrudModal-L1')).toBeNull();
+    expect(document.getElementById('ajaxCrudModal-L2')).toBeNull();
+  });
+
+  it('truncateAbove never destroys the layout-owned level 0 element', () => {
+    const stack = new ModalStack('#ajaxCrudModal');
+    stack.ensureLevel(1);
+    stack.truncateAbove(-1);
+    expect(stack.levels.length).toBe(0);
+    expect(document.getElementById('ajaxCrudModal')).not.toBeNull();
+  });
+});

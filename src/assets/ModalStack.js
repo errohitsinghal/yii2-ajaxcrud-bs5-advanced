@@ -78,5 +78,87 @@
         return ModalStack.classifyIntent(el) === 'nest' ? origin + 1 : origin;
     };
 
+    /**
+     * A bare Bootstrap 5 modal skeleton. The four regions must all exist up front:
+     * ModalRemote caches .modal-dialog/.modal-header/.modal-body/.modal-footer at
+     * construction time, so a region added later would never be seen.
+     */
+    ModalStack.containerHtml = function (level) {
+        return '<div class="modal fade" id="ajaxCrudModal-L' + level + '" tabindex="-1" aria-hidden="true">' +
+                 '<div class="modal-dialog modal-lg">' +
+                   '<div class="modal-content">' +
+                     '<div class="modal-header"></div>' +
+                     '<div class="modal-body"></div>' +
+                     '<div class="modal-footer"></div>' +
+                   '</div>' +
+                 '</div>' +
+               '</div>';
+    };
+
+    ModalStack.bsInstance = function (el) {
+        if (!window.bootstrap || !window.bootstrap.Modal || !el) { return null; }
+        return window.bootstrap.Modal.getInstance(el);
+    };
+
+    /** Grow the stack until `level` exists, and return that level. */
+    ModalStack.prototype.ensureLevel = function (level) {
+        while (this.levels.length <= level) {
+            this.push();
+        }
+        return this.levels[level];
+    };
+
+    ModalStack.prototype.push = function () {
+        var level = this.levels.length;
+        var $el = null;
+        var owned = true;
+
+        // Level 0 reuses the layout's container when it has one, so that views
+        // and JS referencing #ajaxCrudModal keep working.
+        if (level === 0) {
+            var $root = $(this.rootModalId);
+            if ($root.length) {
+                $el = $root.first();
+                owned = false;
+            }
+        }
+
+        if (!$el) {
+            // Body level, always: a container nested inside another modal would
+            // inherit that modal's stacking context and could never paint above it.
+            $el = $(ModalStack.containerHtml(level)).appendTo(document.body);
+        }
+
+        $el.css('z-index', ModalStack.modalZIndex(level));
+
+        var entry = { level: level, $el: $el, owned: owned, remote: null, origin: null };
+        this.levels.push(entry);
+        return entry;
+    };
+
+    ModalStack.prototype.pop = function () {
+        var entry = this.levels.pop();
+        if (!entry) { return; }
+
+        var inst = ModalStack.bsInstance(entry.$el[0]);
+        if (inst) { inst.hide(); }
+
+        // Only remove containers we created. The layout owns level 0's element.
+        if (entry.owned) {
+            if (inst) { inst.dispose(); }
+            entry.$el.remove();
+        }
+    };
+
+    /**
+     * Drop every level deeper than `level`. Clicking a host-page link while two
+     * modals are open must close both rather than orphan them.
+     */
+    ModalStack.prototype.truncateAbove = function (level) {
+        while (this.levels.length > level + 1) {
+            this.pop();
+        }
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));
