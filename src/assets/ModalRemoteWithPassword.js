@@ -234,19 +234,6 @@ function ModalRemote(modalId) {
      */
     function successRemoteResponse(response) {
 
-        // check if force reload target is exists
-        if ($(response.forceReload).length > 0){
-            // Reload datatable if response contain forceReload field
-            if (response.forceReload !== undefined && response.forceReload) {
-                if (response.forceReload == 'true') {
-                    // Backwards compatible reload of fixed crud-datatable-pjax
-                    $.pjax.reload({container: '#crud-datatable-pjax', timeout: 2000});
-                } else {
-                    $.pjax.reload({container: response.forceReload, timeout: 2000});
-                }
-            }
-        }
-
        if(response.toasts !== undefined){
             if (Array.isArray(response.toasts)) {
                 response.toasts.forEach(function(toast){
@@ -295,7 +282,33 @@ function ModalRemote(modalId) {
         // Close modal if response contains forceClose field
         if (response.forceClose !== undefined && response.forceClose) {
             this.hide();
+            // The level below is now stale -- this write is the whole point of the
+            // nested flow. Guarded inside refreshParentAfter: only on a real write,
+            // and never over a parent form the user has typed into.
+            if (this.modalStack) {
+                this.modalStack.refreshParentAfter(this.modalLevel, response);
+            }
             return;
+        }
+
+        // Reload datatable if response contains a forceReload field. Skipped above
+        // when forceClose already triggered a wholesale parent refresh, which
+        // subsumes this -- otherwise a child's save would fetch the same grid twice.
+        if (response.forceReload !== undefined && response.forceReload) {
+            var reloadSelector = (response.forceReload == 'true')
+                ? '#crud-datatable-pjax'   // backwards compatible fixed target
+                : response.forceReload;
+
+            // Resolve nearest-first outward from THIS level rather than document-wide.
+            // ~245 responses emit the same '#crud-datatable-pjax', so a bare $()
+            // picks by DOM order and can reload a host-page grid instead of ours.
+            var $target = this.modalStack
+                ? this.modalStack.resolveReloadTarget(reloadSelector, this.modalLevel)
+                : $(reloadSelector).first();
+
+            if ($target.length > 0) {
+                $.pjax.reload({container: '#' + $target.attr('id'), timeout: 2000});
+            }
         }
 
         if (response.size !== undefined)
