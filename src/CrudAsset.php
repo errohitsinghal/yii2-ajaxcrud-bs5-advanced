@@ -24,11 +24,14 @@ class CrudAsset extends AssetBundle
     ];
 
    public function init() {
-       // In dev mode use non-minified javascripts
+       // ModalStack MUST precede ajaxcrud: ajaxcrud constructs the stack on
+       // document.ready. In dev mode use non-minified javascripts.
        $this->js = YII_DEBUG ? [
+           'ModalStack.js',
            'ModalRemoteWithPassword.js',
            'ajaxcrud.js',
        ]:[
+           'ModalStack.min.js',
            'ModalRemoteWithPassword.min.js',
            'ajaxcrud.min.js',
        ];
