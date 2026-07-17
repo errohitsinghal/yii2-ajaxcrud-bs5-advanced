@@ -161,7 +161,7 @@
     };
 
     /**
-     * Give the backdrop Bootstrap just created this level's z-index.
+     * Give a modal's backdrop this level's z-index.
      *
      * BS5's Backdrop appends a bare div to <body> and never sets z-index, so every
      * backdrop lands at 1050 while every modal sits at 1055 -- meaning a nested
@@ -169,13 +169,24 @@
      * child of the modal, so it cannot inherit a custom property from it; the value
      * has to be written onto the element.
      *
-     * Untagged-and-last identifies the new one without depending on DOM order races.
+     * Ask the Modal instance which backdrop is its own rather than guessing from
+     * the DOM. An earlier version selected whichever backdrop div lacked a
+     * data-modal-level attribute and came last in the DOM, assuming exactly one
+     * untagged backdrop existed -- reopening a nested modal then re-stamped the
+     * PARENT's backdrop with the child's level and z-index, painting it over the
+     * parent. (BS5's Backdrop.dispose() removes its element without nulling
+     * _element, so a reopened modal re-appends the same already-tagged div,
+     * leaving the parent's as the only untagged one.)
+     *
+     * Touches a Bootstrap private. Pinned to Bootstrap 5.3.8 -- re-check on upgrade.
      */
-    ModalStack.claimBackdrop = function (level) {
-        var $bd = $('.modal-backdrop').not('[data-modal-level]').last();
-        if (!$bd.length) { return; }
-        $bd.attr('data-modal-level', String(level))
-           .css('z-index', ModalStack.backdropZIndex(level));
+    ModalStack.claimBackdrop = function (level, el, getInstance) {
+        var inst = (getInstance || ModalStack.bsInstance)(el);
+        var bd = inst && inst._backdrop && inst._backdrop._element;
+        if (!bd) { return; }
+
+        bd.setAttribute('data-modal-level', String(level));
+        bd.style.zIndex = String(ModalStack.backdropZIndex(level));
     };
 
     /**
@@ -278,32 +289,36 @@
      */
     ModalStack.prototype.remoteFor = function (level) {
         var entry = this.ensureLevel(level);
-        if (!entry.remote) {
-            entry.remote = new window.ModalRemote('#' + entry.$el.attr('id'));
-            entry.remote.modalLevel = level;
-            entry.remote.modalStack = this;
-        }
+        if (entry.remote) { return entry.remote; }
+
+        var stack = this;
+        entry.remote = new window.ModalRemote('#' + entry.$el.attr('id'));
+        entry.remote.modalLevel = level;
+        entry.remote.modalStack = this;
+
+        // Bind HERE, not in driveLevel: ajaxcrud.js calls remoteFor(0) at
+        // document.ready to keep the legacy `modal` global alive, which made
+        // driveLevel's "is this new?" check permanently false for level 0 -- so
+        // level 0 never tagged its backdrop, and claimBackdrop's DOM guess then
+        // mis-stamped it with a child's level.
+        entry.$el.on('shown.bs.modal', function () {
+            ModalStack.claimBackdrop(level, entry.$el[0]);
+        });
+
+        entry.$el.on('hidden.bs.modal', function () {
+            var parent = stack.levels[level - 1];
+            if (parent) { ModalStack.restoreFocusTrap(parent.$el[0]); }
+        });
+
         return entry.remote;
     };
 
     /**
-     * Bind a ModalRemote to `level` (once) and open `el`'s target in it.
+     * Drive `level`'s ModalRemote to open `el`'s target.
      */
     ModalStack.prototype.driveLevel = function (level, el, bulkData) {
         var entry = this.levels[level];
-        var stack = this;
-        var isNew = !entry.remote;
         var remote = this.remoteFor(level);
-
-        if (isNew) {
-            entry.$el.on('shown.bs.modal', function () {
-                ModalStack.claimBackdrop(level);
-            });
-            entry.$el.on('hidden.bs.modal', function () {
-                var parent = stack.levels[level - 1];
-                if (parent) { ModalStack.restoreFocusTrap(parent.$el[0]); }
-            });
-        }
 
         // Remember where this level came from, so a child that writes can refresh it.
         entry.origin = {

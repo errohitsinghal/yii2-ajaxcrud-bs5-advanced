@@ -205,29 +205,72 @@ describe('ModalStack Bootstrap workarounds', () => {
     document.body.innerHTML = '';
   });
 
-  it('tags and z-indexes the backdrop Bootstrap just created', () => {
-    document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop"></div>');
-    ModalStack.claimBackdrop(1);
-    const bd = document.querySelector('.modal-backdrop');
+  it("tags and z-indexes the backdrop belonging to the given modal's instance", () => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop" id="bd"></div>');
+    const el = document.createElement('div');
+    const fake = () => ({ _backdrop: { _element: document.getElementById('bd') } });
+
+    ModalStack.claimBackdrop(1, el, fake);
+
+    const bd = document.getElementById('bd');
     expect(bd.getAttribute('data-modal-level')).toBe('1');
     expect(bd.style.zIndex).toBe(String(ModalStack.backdropZIndex(1)));
   });
 
-  it('never re-claims a backdrop already owned by another level', () => {
-    document.body.insertAdjacentHTML('beforeend',
-      '<div class="modal-backdrop" data-modal-level="0" style="z-index:1050"></div>');
-    ModalStack.claimBackdrop(1);
-    const bd = document.querySelector('.modal-backdrop');
-    expect(bd.getAttribute('data-modal-level')).toBe('0');
+  it("REGRESSION: reopening a child never re-stamps the parent's still-untagged backdrop", () => {
+    // Models the exact live-browser failure. Level 0 never binds claimBackdrop (it
+    // reuses the layout's remote from document.ready), so its backdrop is
+    // PERMANENTLY untagged. BS5's Backdrop.dispose() removes its element from the
+    // DOM without nulling `_element`, so when level 1 is reopened, the SAME
+    // already-tagged div is re-appended -- it is not "untagged and newest"
+    // anymore. A DOM-guessing claimBackdrop (`$('.modal-backdrop')
+    // .not('[data-modal-level]').last()`) then finds only the parent's backdrop
+    // untagged and wrongly stamps IT with the child's level/z-index, painting it
+    // over the still-open parent modal.
+    document.body.innerHTML =
+      '<div class="modal-backdrop" id="parentBd"></div>' +                               // level 0's, never tagged
+      '<div class="modal-backdrop" id="childBd" data-modal-level="1" style="z-index:1070"></div>'; // level 1's, from its first open
+    const childEl = document.createElement('div');
+    const fake = () => ({ _backdrop: { _element: document.getElementById('childBd') } });
+
+    ModalStack.claimBackdrop(1, childEl, fake);
+
+    expect(document.getElementById('childBd').dataset.modalLevel).toBe('1');
+    expect(document.getElementById('childBd').style.zIndex).toBe(String(ModalStack.backdropZIndex(1)));
+    // The parent's must be untouched -- stamping it was the bug.
+    expect(document.getElementById('parentBd').dataset.modalLevel).toBeUndefined();
+    expect(document.getElementById('parentBd').style.zIndex).toBe('');
   });
 
-  it('claims only the newest backdrop when several are open', () => {
-    document.body.insertAdjacentHTML('beforeend',
-      '<div class="modal-backdrop" data-modal-level="0"></div><div class="modal-backdrop"></div>');
-    ModalStack.claimBackdrop(1);
-    const all = document.querySelectorAll('.modal-backdrop');
-    expect(all[0].getAttribute('data-modal-level')).toBe('0');
-    expect(all[1].getAttribute('data-modal-level')).toBe('1');
+  it("re-claiming the same modal's (cached) backdrop is idempotent", () => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop" id="bd"></div>');
+    const el = document.createElement('div');
+    const fake = () => ({ _backdrop: { _element: document.getElementById('bd') } });
+
+    ModalStack.claimBackdrop(1, el, fake);
+    // BS5's Backdrop.dispose() removes the element without nulling _element, so a
+    // reopened modal re-appends the very same (already-tagged) div. Re-claiming it
+    // must land on the same level/z-index, not drift or throw.
+    ModalStack.claimBackdrop(1, el, fake);
+
+    const bd = document.getElementById('bd');
+    expect(bd.getAttribute('data-modal-level')).toBe('1');
+    expect(bd.style.zIndex).toBe(String(ModalStack.backdropZIndex(1)));
+  });
+
+  it('is a no-op when the element has no Bootstrap instance', () => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop" id="bd"></div>');
+    expect(() => ModalStack.claimBackdrop(1, document.createElement('div'), () => null)).not.toThrow();
+    const bd = document.getElementById('bd');
+    expect(bd.getAttribute('data-modal-level')).toBeNull();
+  });
+
+  it('is a no-op when the instance has no backdrop element yet', () => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop" id="bd"></div>');
+    const fake = () => ({ _backdrop: null });
+    expect(() => ModalStack.claimBackdrop(1, document.createElement('div'), fake)).not.toThrow();
+    const bd = document.getElementById('bd');
+    expect(bd.getAttribute('data-modal-level')).toBeNull();
   });
 
   it('resets _isActive before re-activating, or activate() early-returns forever', () => {
