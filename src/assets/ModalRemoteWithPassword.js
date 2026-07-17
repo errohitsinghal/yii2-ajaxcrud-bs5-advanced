@@ -181,6 +181,11 @@ function ModalRemote(modalId) {
      */
     this.doRemote = function (url, method, data, successcallback=null) {
         var instance = this;
+        // Captured up front: successRemoteResponse gets no `settings` object,
+        // so this is how the toast inference (below) tells GET apart from a
+        // write. doRemote runs synchronously (async: false) so there is no
+        // interleaving with a second call before this one's success fires.
+        this.lastRequestMethod = method;
         $.ajax({
             url: url,
             method: method,
@@ -234,51 +239,15 @@ function ModalRemote(modalId) {
      */
     function successRemoteResponse(response) {
 
-       if(response.toasts !== undefined){
-            if (Array.isArray(response.toasts)) {
-                response.toasts.forEach(function(toast){
-                    // Use Bootstrap 5 native toast
-                    var bgClass = {
-                        'info': 'bg-info',
-                        'success': 'bg-success', 
-                        'warning': 'bg-warning',
-                        'danger': 'bg-danger',
-                        'error': 'bg-danger'
-                    }[toast.type] || 'bg-info';
-                    
-                    var textClass = (toast.type === 'warning') ? 'text-dark' : 'text-white';
-                    
-                    // Create toast container if it doesn't exist
-                    var container = document.getElementById('toast-container');
-                    if (!container) {
-                        container = document.createElement('div');
-                        container.id = 'toast-container';
-                        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-                        container.style.zIndex = '99999999';
-                        document.body.appendChild(container);
-                    }
-                    
-                    var toastId = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                    var toastHtml = '<div id="' + toastId + '" class="toast align-items-center ' + bgClass + ' ' + textClass + ' border-0" role="alert" aria-live="assertive" aria-atomic="true">' +
-                        '<div class="d-flex">' +
-                            '<div class="toast-body">' + toast.message + '</div>' +
-                            '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>' +
-                        '</div>' +
-                    '</div>';
-                    
-                    container.insertAdjacentHTML('beforeend', toastHtml);
-                    
-                    var toastElement = document.getElementById(toastId);
-                    var bsToast = new bootstrap.Toast(toastElement, { delay: 5000 });
-                    bsToast.show();
-                    
-                    toastElement.addEventListener('hidden.bs.toast', function() {
-                        toastElement.remove();
-                    });
-                }, this);
-            }
-        }
-                
+        // Explicit response.toasts always wins (infer nothing); otherwise
+        // infer a toast from forceClose / the rendered content. See
+        // ModalRemote.decideToasts for the full contract this package now
+        // owns single-handedly (absorbed from the consuming app's
+        // duplicate ajaxSuccess listener, which is removed separately).
+        ModalRemote.decideToasts(response, this.lastRequestMethod).forEach(function (toast) {
+            ModalRemote.showToast(toast.message, toast.type);
+        });
+
         // Close modal if response contains forceClose field
         if (response.forceClose !== undefined && response.forceClose) {
             this.hide();
@@ -619,3 +588,169 @@ function ModalRemote(modalId) {
 
 
 } // End of Object
+
+/**
+ * Render one Bootstrap 5 toast into the shared #toast-container.
+ *
+ * The single toast renderer: an explicit response.toasts entry and the
+ * inferred classifier below (ModalRemote.decideToasts / .inferToast) both
+ * funnel through here, so there is exactly one way a toast reaches the
+ * screen and exactly one place its styling lives.
+ *
+ * @param {string} message
+ * @param {string} [type] info|success|warning|danger|error
+ */
+ModalRemote.showToast = function (message, type) {
+    var bgClass = {
+        'info': 'bg-info',
+        'success': 'bg-success',
+        'warning': 'bg-warning',
+        'danger': 'bg-danger',
+        'error': 'bg-danger'
+    }[type] || 'bg-info';
+
+    var textClass = (type === 'warning') ? 'text-dark' : 'text-white';
+
+    // Create toast container if it doesn't exist
+    var container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '99999999';
+        document.body.appendChild(container);
+    }
+
+    var toastId = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+    var toastElement = document.createElement('div');
+    toastElement.id = toastId;
+    toastElement.className = 'toast align-items-center ' + bgClass + ' ' + textClass + ' border-0';
+    toastElement.setAttribute('role', 'alert');
+    toastElement.setAttribute('aria-live', 'assertive');
+    toastElement.setAttribute('aria-atomic', 'true');
+
+    var flex = document.createElement('div');
+    flex.className = 'd-flex';
+
+    var body = document.createElement('div');
+    body.className = 'toast-body';
+    body.textContent = message; // textContent -- never HTML-inject (real XSS boundary)
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+    closeBtn.setAttribute('data-bs-dismiss', 'toast');
+    closeBtn.setAttribute('aria-label', 'Close');
+
+    flex.appendChild(body);
+    flex.appendChild(closeBtn);
+    toastElement.appendChild(flex);
+    container.appendChild(toastElement);
+
+    // Feature-detected: absent in the jsdom test harness and in case
+    // Bootstrap's JS bundle hasn't loaded yet.
+    if (window.bootstrap && window.bootstrap.Toast) {
+        var bsToast = new window.bootstrap.Toast(toastElement, { delay: 5000 });
+        bsToast.show();
+    }
+
+    toastElement.addEventListener('hidden.bs.toast', function () {
+        toastElement.remove();
+    });
+};
+
+/**
+ * Classify a modal-remote HTML fragment by its RENDERED markers, not
+ * substrings. Bootstrap5 yii forms embed the literal strings "is-invalid"/
+ * "has-error" inside their embedded yiiActiveForm config JSON, so a naive
+ * String#indexOf would false-positive on every such form. DOMParser never
+ * executes scripts, and querySelector only ever sees real elements, so the
+ * JSON-embedded strings can't trigger a false positive here.
+ *
+ * @param {string} html
+ * @return {('danger'|'success'|null)}
+ */
+ModalRemote.classifyContent = function (html) {
+    if (typeof html !== 'string' || typeof DOMParser === 'undefined') {
+        return null;
+    }
+
+    var doc;
+    try {
+        doc = new DOMParser().parseFromString(html, 'text/html');
+    } catch (e) {
+        return null;
+    }
+    if (!doc) { return null; }
+
+    if (doc.querySelector('.has-error, .is-invalid, .alert-danger')) {
+        // base ActiveForm marks field wrappers has-error; bootstrap5 marks
+        // inputs is-invalid; message-style failures use alert-danger.
+        return 'danger';
+    }
+    if (doc.querySelector('.alert-success, .text-success')) {
+        return 'success';
+    }
+    if (doc.querySelector('form')) {
+        // A form came back with no error/success markers -- outcome
+        // unknowable; better silent than wrong.
+        return null;
+    }
+    // No form, no markers: a view/detail re-render after a save.
+    return 'success';
+};
+
+/**
+ * Decide the toast for a response that carries no explicit
+ * response.toasts, given the request method.
+ *
+ * successRemoteResponse receives no `settings` object to read the HTTP
+ * method from, so doRemote captures it up front as
+ * `this.lastRequestMethod` and it is threaded in here as `method`.
+ *
+ * @param {object} response
+ * @param {string} [method]
+ * @return {({type: string, message: string}|null)}
+ */
+ModalRemote.inferToast = function (response, method) {
+    if (!response) { return null; }
+
+    if (response.forceClose) {
+        return { type: 'success', message: 'Action completed' };
+    }
+
+    var verb = (method || 'GET').toUpperCase();
+    if (verb === 'GET') { return null; } // form/view loads never toast
+    if (typeof response.content !== 'string') { return null; }
+
+    var outcome = ModalRemote.classifyContent(response.content);
+    if (!outcome) { return null; }
+
+    return {
+        type: outcome,
+        message: outcome === 'danger' ? 'Please fix the highlighted errors' : 'Saved successfully'
+    };
+};
+
+/**
+ * Full toast decision for a modal-remote response. An explicit
+ * response.toasts array always wins and nothing is inferred from the
+ * content/method; otherwise fall back to inferToast. Pure: returns what to
+ * render, it does not render anything itself (successRemoteResponse renders
+ * each entry via ModalRemote.showToast).
+ *
+ * @param {object} response
+ * @param {string} [method]
+ * @return {Array<{type: string, message: string}>}
+ */
+ModalRemote.decideToasts = function (response, method) {
+    if (response && Array.isArray(response.toasts) && response.toasts.length) {
+        return response.toasts.map(function (toast) {
+            return { type: toast.type, message: toast.message };
+        });
+    }
+
+    var inferred = ModalRemote.inferToast(response, method);
+    return inferred ? [inferred] : [];
+};
