@@ -32,5 +32,27 @@
         return BASE_BACKDROP_Z + level * LEVEL_STEP;
     };
 
+    /**
+     * Step or nest? Ask: will the user come back to this modal?
+     *
+     * Footer  -> no. It is the modal's action bar; taking one of its verbs means
+     *            you are done here. Replace in place (today's behaviour).
+     * Body    -> yes. It is content; the link is a detour to another record.
+     *
+     * Reads only the region the link sits in -- never the URL or the entity.
+     * A footer "Create More" targets a brand-new record yet must still step.
+     */
+    ModalStack.classifyIntent = function (el) {
+        var $el = $(el);
+
+        if ($el.is('[data-modal-nest]')) { return 'nest'; }
+        if ($el.is('[data-modal-step]')) { return 'step'; }
+
+        // Not inside a modal: nothing to nest onto.
+        if (!$el.closest('.modal').length) { return 'step'; }
+
+        return $el.closest('.modal-footer').length ? 'step' : 'nest';
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));

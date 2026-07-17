@@ -47,3 +47,44 @@ describe('ModalStack z-index arithmetic', () => {
     }
   });
 });
+
+describe('ModalStack.classifyIntent', () => {
+  let ModalStack;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = `
+      <a id="host" role="modal-remote" href="/x">host page link</a>
+      <div class="modal" id="m0">
+        <div class="modal-dialog"><div class="modal-content">
+          <div class="modal-body">
+            <a id="bodyLink" role="modal-remote" href="/add-member">Add member</a>
+            <a id="bodyStep" role="modal-remote" data-modal-step href="/y">forced step</a>
+          </div>
+          <div class="modal-footer">
+            <a id="footerLink" role="modal-remote" href="/update">Edit</a>
+            <a id="footerNest" role="modal-remote" data-modal-nest href="/z">forced nest</a>
+          </div>
+        </div></div>
+      </div>`;
+  });
+
+  it('nests a link in the modal body (a detour you return from)', () => {
+    expect(ModalStack.classifyIntent(document.getElementById('bodyLink'))).toBe('nest');
+  });
+
+  it('steps a link in the modal footer (the modal is done)', () => {
+    expect(ModalStack.classifyIntent(document.getElementById('footerLink'))).toBe('step');
+  });
+
+  it('steps a host-page link: there is nothing to nest onto', () => {
+    expect(ModalStack.classifyIntent(document.getElementById('host'))).toBe('step');
+  });
+
+  it('honours data-modal-step over the body default', () => {
+    expect(ModalStack.classifyIntent(document.getElementById('bodyStep'))).toBe('step');
+  });
+
+  it('honours data-modal-nest over the footer default', () => {
+    expect(ModalStack.classifyIntent(document.getElementById('footerNest'))).toBe('nest');
+  });
+});
