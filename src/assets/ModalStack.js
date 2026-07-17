@@ -54,5 +54,29 @@
         return $el.closest('.modal-footer').length ? 'step' : 'nest';
     };
 
+    /**
+     * Which level is this element inside? -1 for the host page.
+     * Identity-compares DOM nodes -- never ids, which are not unique in the
+     * consuming app (duplicate #ajaxCrudModal declarations exist).
+     */
+    ModalStack.prototype.levelOf = function (el) {
+        var $modal = $(el).closest('.modal');
+        if (!$modal.length) { return -1; }
+
+        for (var i = 0; i < this.levels.length; i++) {
+            if (this.levels[i].$el[0] === $modal[0]) { return i; }
+        }
+        return -1;
+    };
+
+    /**
+     * Which level should this click drive?
+     */
+    ModalStack.prototype.targetLevelFor = function (el) {
+        var origin = this.levelOf(el);
+        if (origin < 0) { return 0; }
+        return ModalStack.classifyIntent(el) === 'nest' ? origin + 1 : origin;
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));

@@ -88,3 +88,43 @@ describe('ModalStack.classifyIntent', () => {
     expect(ModalStack.classifyIntent(document.getElementById('footerNest'))).toBe('nest');
   });
 });
+
+describe('ModalStack level mapping', () => {
+  let ModalStack, stack;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = `
+      <a id="host" role="modal-remote" href="/x">host</a>
+      <div class="modal" id="L0"><div class="modal-content">
+        <div class="modal-body"><a id="b0" href="/a">body L0</a></div>
+        <div class="modal-footer"><a id="f0" href="/b">footer L0</a></div>
+      </div></div>
+      <div class="modal" id="L1"><div class="modal-content">
+        <div class="modal-body"><a id="b1" href="/c">body L1</a></div>
+      </div></div>`;
+    stack = new ModalStack('#L0');
+    stack.levels = [{ $el: jQuery('#L0') }, { $el: jQuery('#L1') }];
+  });
+
+  it('reports -1 for a host-page element', () => {
+    expect(stack.levelOf(document.getElementById('host'))).toBe(-1);
+  });
+
+  it('reports the level of the modal an element sits in', () => {
+    expect(stack.levelOf(document.getElementById('b0'))).toBe(0);
+    expect(stack.levelOf(document.getElementById('b1'))).toBe(1);
+  });
+
+  it('drives level 0 from the host page', () => {
+    expect(stack.targetLevelFor(document.getElementById('host'))).toBe(0);
+  });
+
+  it('nests a body link one level above its own modal', () => {
+    expect(stack.targetLevelFor(document.getElementById('b0'))).toBe(1);
+    expect(stack.targetLevelFor(document.getElementById('b1'))).toBe(2);
+  });
+
+  it('steps a footer link at its own level', () => {
+    expect(stack.targetLevelFor(document.getElementById('f0'))).toBe(0);
+  });
+});
