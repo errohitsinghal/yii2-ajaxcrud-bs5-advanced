@@ -252,5 +252,26 @@
         return true;
     };
 
+    /**
+     * Find a forceReload target deterministically.
+     *
+     * ~245 controller responses emit the same '#crud-datatable-pjax', and a bare
+     * document-wide $() picks by DOM order -- so a child's save can silently reload
+     * a grid on the host page instead of the one in the parent modal. Search
+     * outward from the emitter (skipping the emitter's own level, which is going
+     * away), then the host page.
+     */
+    ModalStack.prototype.resolveReloadTarget = function (selector, emittingLevel) {
+        for (var i = emittingLevel - 1; i >= 0; i--) {
+            var $hit = this.levels[i].$el.find(selector);
+            if ($hit.length) { return $hit.first(); }
+        }
+
+        var $host = $(selector).filter(function () {
+            return !$(this).closest('.modal').length;
+        });
+        return $host.length ? $host.first() : $();
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));

@@ -336,3 +336,44 @@ describe('ModalStack.refreshParentAfter', () => {
     expect(stack.refreshParentAfter(0, { forceClose: true })).toBe(false);
   });
 });
+
+describe('ModalStack.resolveReloadTarget', () => {
+  let ModalStack, stack;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = `
+      <div id="crud-datatable-pjax" data-where="host"></div>
+      <div class="modal" id="L0"><div class="modal-body">
+        <div id="crud-datatable-pjax" data-where="L0"></div>
+      </div></div>
+      <div class="modal" id="L1"><div class="modal-body">
+        <div id="crud-datatable-pjax" data-where="L1"></div>
+      </div></div>`;
+    stack = new ModalStack('#L0');
+    stack.levels = [{ $el: jQuery('#L0') }, { $el: jQuery('#L1') }];
+  });
+
+  it('prefers the nearest level below the emitter over the host page', () => {
+    expect(stack.resolveReloadTarget('#crud-datatable-pjax', 1).attr('data-where')).toBe('L0');
+  });
+
+  it('never resolves to the emitting level itself', () => {
+    expect(stack.resolveReloadTarget('#crud-datatable-pjax', 1).attr('data-where')).not.toBe('L1');
+  });
+
+  it('falls back to the host page for a level-0 emitter', () => {
+    expect(stack.resolveReloadTarget('#crud-datatable-pjax', 0).attr('data-where')).toBe('host');
+  });
+
+  it('never returns a host-page match that is actually inside a modal', () => {
+    document.body.innerHTML = `
+      <div class="modal" id="L0"><div class="modal-body"><div id="only-in-modal"></div></div></div>`;
+    const s = new ModalStack('#L0');
+    s.levels = [{ $el: jQuery('#L0') }];
+    expect(s.resolveReloadTarget('#only-in-modal', 0).length).toBe(0);
+  });
+
+  it('returns an empty set when nothing matches', () => {
+    expect(stack.resolveReloadTarget('#nope', 1).length).toBe(0);
+  });
+});
