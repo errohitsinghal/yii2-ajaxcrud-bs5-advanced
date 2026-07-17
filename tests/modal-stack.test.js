@@ -197,3 +197,47 @@ describe('ModalStack container lifecycle', () => {
     expect(document.getElementById('ajaxCrudModal')).not.toBeNull();
   });
 });
+
+describe('ModalStack Bootstrap workarounds', () => {
+  let ModalStack;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = '';
+  });
+
+  it('tags and z-indexes the backdrop Bootstrap just created', () => {
+    document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop"></div>');
+    ModalStack.claimBackdrop(1);
+    const bd = document.querySelector('.modal-backdrop');
+    expect(bd.getAttribute('data-modal-level')).toBe('1');
+    expect(bd.style.zIndex).toBe(String(ModalStack.backdropZIndex(1)));
+  });
+
+  it('never re-claims a backdrop already owned by another level', () => {
+    document.body.insertAdjacentHTML('beforeend',
+      '<div class="modal-backdrop" data-modal-level="0" style="z-index:1050"></div>');
+    ModalStack.claimBackdrop(1);
+    const bd = document.querySelector('.modal-backdrop');
+    expect(bd.getAttribute('data-modal-level')).toBe('0');
+  });
+
+  it('claims only the newest backdrop when several are open', () => {
+    document.body.insertAdjacentHTML('beforeend',
+      '<div class="modal-backdrop" data-modal-level="0"></div><div class="modal-backdrop"></div>');
+    ModalStack.claimBackdrop(1);
+    const all = document.querySelectorAll('.modal-backdrop');
+    expect(all[0].getAttribute('data-modal-level')).toBe('0');
+    expect(all[1].getAttribute('data-modal-level')).toBe('1');
+  });
+
+  it('resets _isActive before re-activating, or activate() early-returns forever', () => {
+    const calls = [];
+    const trap = { _isActive: true, activate() { calls.push(this._isActive); } };
+    ModalStack.restoreFocusTrap(document.createElement('div'), () => ({ _focustrap: trap }));
+    expect(calls).toEqual([false]);
+  });
+
+  it('is a no-op when the element has no Bootstrap instance', () => {
+    expect(() => ModalStack.restoreFocusTrap(document.createElement('div'), () => null)).not.toThrow();
+  });
+});

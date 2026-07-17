@@ -160,5 +160,42 @@
         }
     };
 
+    /**
+     * Give the backdrop Bootstrap just created this level's z-index.
+     *
+     * BS5's Backdrop appends a bare div to <body> and never sets z-index, so every
+     * backdrop lands at 1050 while every modal sits at 1055 -- meaning a nested
+     * modal's backdrop paints BELOW the parent's dialog. The backdrop is not a
+     * child of the modal, so it cannot inherit a custom property from it; the value
+     * has to be written onto the element.
+     *
+     * Untagged-and-last identifies the new one without depending on DOM order races.
+     */
+    ModalStack.claimBackdrop = function (level) {
+        var $bd = $('.modal-backdrop').not('[data-modal-level]').last();
+        if (!$bd.length) { return; }
+        $bd.attr('data-modal-level', String(level))
+           .css('z-index', ModalStack.backdropZIndex(level));
+    };
+
+    /**
+     * Re-arm a parent modal's focus trap after a child closed.
+     *
+     * BS5's FocusTrap.activate() calls EventHandler.off(document, ...) before
+     * binding, which DESTROYS the parent's trap rather than suspending it, while
+     * leaving parentTrap._isActive === true. deactivate() never restores it, and
+     * activate() early-returns forever while _isActive. Without resetting the flag
+     * first the parent is left with no trap: tab escapes to the page behind, and
+     * ESC (bound through the trap) dies with it.
+     *
+     * Touches a Bootstrap private. Pinned to Bootstrap 5.3.8 -- re-check on upgrade.
+     */
+    ModalStack.restoreFocusTrap = function (el, getInstance) {
+        var inst = (getInstance || ModalStack.bsInstance)(el);
+        if (!inst || !inst._focustrap) { return; }
+        inst._focustrap._isActive = false;
+        inst._focustrap.activate();
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));
