@@ -197,5 +197,60 @@
         inst._focustrap.activate();
     };
 
+    /**
+     * Did this response represent a write? Only then is the parent stale.
+     * A plain content response (a form being (re)rendered) is not a write.
+     */
+    ModalStack.responseMutated = function (response) {
+        return !!(response && (response.forceClose || response.forceReload));
+    };
+
+    /**
+     * Has the user typed into anything in this scope?
+     *
+     * Guards auto-refresh: a side-trip to create a lookup value must not wipe the
+     * half-filled parent form that sent you there. Hidden and disabled fields are
+     * ignored -- the app rewrites those programmatically (CSRF, etc.) and they are
+     * not user input.
+     */
+    ModalStack.hasDirtyForm = function ($scope) {
+        var dirty = false;
+
+        $scope.find('input, textarea, select').each(function () {
+            var el = this;
+            if (el.disabled || el.type === 'hidden') { return; }
+
+            if (el.type === 'checkbox' || el.type === 'radio') {
+                if (el.checked !== el.defaultChecked) { dirty = true; return false; }
+            } else if (el.tagName === 'SELECT') {
+                for (var i = 0; i < el.options.length; i++) {
+                    if (el.options[i].selected !== el.options[i].defaultSelected) {
+                        dirty = true;
+                        return false;
+                    }
+                }
+            } else if (typeof el.defaultValue === 'string') {
+                if (el.value !== el.defaultValue) { dirty = true; return false; }
+            }
+        });
+
+        return dirty;
+    };
+
+    /**
+     * A child at `level` finished. Refresh the level below it if it is now stale.
+     * Returns true when a refresh was issued (the caller suppresses the response's
+     * own forceReload in that case, to avoid fetching the same data twice).
+     */
+    ModalStack.prototype.refreshParentAfter = function (level, response) {
+        var parent = this.levels[level - 1];
+        if (!parent || !parent.origin || !parent.remote) { return false; }
+        if (!ModalStack.responseMutated(response)) { return false; }
+        if (ModalStack.hasDirtyForm(parent.$el)) { return false; }
+
+        parent.remote.doRemote(parent.origin.url, parent.origin.method, parent.origin.data);
+        return true;
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));

@@ -241,3 +241,98 @@ describe('ModalStack Bootstrap workarounds', () => {
     expect(() => ModalStack.restoreFocusTrap(document.createElement('div'), () => null)).not.toThrow();
   });
 });
+
+describe('ModalStack.responseMutated', () => {
+  let ModalStack;
+  beforeEach(() => { ModalStack = loadModalStack(); });
+
+  it('treats forceClose or forceReload as evidence of a write', () => {
+    expect(ModalStack.responseMutated({ forceClose: true })).toBe(true);
+    expect(ModalStack.responseMutated({ forceReload: '#crud-datatable-pjax' })).toBe(true);
+  });
+
+  it('treats a plain content response as no write', () => {
+    expect(ModalStack.responseMutated({ title: 'Edit', content: '<form>' })).toBe(false);
+    expect(ModalStack.responseMutated(null)).toBe(false);
+  });
+});
+
+describe('ModalStack.hasDirtyForm', () => {
+  let ModalStack;
+  beforeEach(() => { ModalStack = loadModalStack(); });
+
+  function scope(html) {
+    document.body.innerHTML = '<div id="s">' + html + '</div>';
+    return jQuery('#s');
+  }
+
+  it('is clean for an untouched form', () => {
+    expect(ModalStack.hasDirtyForm(scope('<input value="a"><textarea>t</textarea>'))).toBe(false);
+  });
+
+  it('is dirty once a text input diverges from its default', () => {
+    const $s = scope('<input value="a">');
+    $s.find('input')[0].value = 'changed';
+    expect(ModalStack.hasDirtyForm($s)).toBe(true);
+  });
+
+  it('is dirty once a checkbox diverges from its default', () => {
+    const $s = scope('<input type="checkbox" checked>');
+    $s.find('input')[0].checked = false;
+    expect(ModalStack.hasDirtyForm($s)).toBe(true);
+  });
+
+  it('is dirty once a select diverges from its default', () => {
+    const $s = scope('<select><option selected>a</option><option>b</option></select>');
+    $s.find('select')[0].selectedIndex = 1;
+    expect(ModalStack.hasDirtyForm($s)).toBe(true);
+  });
+
+  it('ignores hidden and disabled fields, which the app sets programmatically', () => {
+    const $s = scope('<input type="hidden" value="a"><input value="b" disabled>');
+    $s.find('input')[0].value = 'csrf-rotated';
+    $s.find('input')[1].value = 'changed';
+    expect(ModalStack.hasDirtyForm($s)).toBe(false);
+  });
+});
+
+describe('ModalStack.refreshParentAfter', () => {
+  let ModalStack, stack, refetched;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = `
+      <div class="modal" id="L0"><div class="modal-body"><input id="pf" value="typed"></div></div>
+      <div class="modal" id="L1"><div class="modal-body"></div></div>`;
+    refetched = [];
+    stack = new ModalStack('#L0');
+    stack.levels = [
+      {
+        level: 0,
+        $el: jQuery('#L0'),
+        origin: { url: '/org/view?id=1', method: 'GET', data: null },
+        remote: { doRemote: (u, m, d) => refetched.push({ u, m, d }) },
+      },
+      { level: 1, $el: jQuery('#L1'), origin: null, remote: {} },
+    ];
+  });
+
+  it("re-issues the parent's originating request after a child writes", () => {
+    expect(stack.refreshParentAfter(1, { forceClose: true })).toBe(true);
+    expect(refetched).toEqual([{ u: '/org/view?id=1', m: 'GET', d: null }]);
+  });
+
+  it('does not refresh when the child only rendered content', () => {
+    expect(stack.refreshParentAfter(1, { title: 'x', content: '<form>' })).toBe(false);
+    expect(refetched).toEqual([]);
+  });
+
+  it('does not blow away a parent form the user has typed into', () => {
+    document.getElementById('pf').value = 'half-filled';
+    expect(stack.refreshParentAfter(1, { forceClose: true })).toBe(false);
+    expect(refetched).toEqual([]);
+  });
+
+  it('is a no-op at level 0, which has no parent', () => {
+    expect(stack.refreshParentAfter(0, { forceClose: true })).toBe(false);
+  });
+});
