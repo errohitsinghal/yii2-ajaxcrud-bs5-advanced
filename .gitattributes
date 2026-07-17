@@ -15,3 +15,9 @@
 *.PDF	 diff=astextplain
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
+
+# Dev-only; never ship in the composer dist
+/tests             export-ignore
+/package.json      export-ignore
+/package-lock.json export-ignore
+/vitest.config.js  export-ignore

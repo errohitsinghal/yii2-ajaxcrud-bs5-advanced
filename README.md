@@ -158,3 +158,18 @@ This extension fully supports Bootstrap 5 CSS classes including:
 Contributing
 ---------
 Lets contribute to keep it updated and make it useful for all friends.
+
+## Development
+
+This package ships plain `src/` — consumers need no build step. npm is used only for
+local development.
+
+```bash
+npm install
+npm test        # vitest + jsdom unit tests
+npm run build   # regenerate every src/assets/*.min.js from its .js twin
+```
+
+**Always run `npm run build` after editing anything in `src/assets/`.** `CrudAsset`
+serves the `.min.js` files whenever `YII_DEBUG` is off, so an un-rebuilt twin means your
+change works in development and silently does nothing in production.

@@ -1,0 +1,14 @@
+{
+  "name": "yii2-ajaxcrud-bs5-advanced",
+  "private": true,
+  "description": "Dev tooling only. The composer package ships src/ ; npm is used to build .min.js twins and run unit tests.",
+  "scripts": {
+    "build": "terser src/assets/ModalRemoteWithPassword.js -c -m -o src/assets/ModalRemoteWithPassword.min.js && terser src/assets/ajaxcrud.js -c -m -o src/assets/ajaxcrud.min.js && terser src/assets/ModalRemote.js -c -m -o src/assets/ModalRemote.min.js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "terser": "^5.31.0",
+    "vitest": "^1.6.0"
+  }
+}
