@@ -377,3 +377,43 @@ describe('ModalStack.resolveReloadTarget', () => {
     expect(stack.resolveReloadTarget('#nope', 1).length).toBe(0);
   });
 });
+
+describe('ModalStack.openFrom', () => {
+  let ModalStack, stack, drives;
+  beforeEach(() => {
+    ModalStack = loadModalStack();
+    document.body.innerHTML = `
+      <a id="host" role="modal-remote" href="/host">host</a>
+      <div class="modal" id="ajaxCrudModal"><div class="modal-content">
+        <div class="modal-header"></div>
+        <div class="modal-body"><a id="body" role="modal-remote" href="/nest">nest me</a></div>
+        <div class="modal-footer"><a id="foot" role="modal-remote" href="/step">step me</a></div>
+      </div></div>`;
+    drives = [];
+    stack = new ModalStack('#ajaxCrudModal');
+    stack.driveLevel = (level, el) => drives.push({ level, href: el.getAttribute('href') });
+  });
+
+  it('drives level 0 for a host-page click', () => {
+    stack.openFrom(document.getElementById('host'));
+    expect(drives).toEqual([{ level: 0, href: '/host' }]);
+  });
+
+  it('drives level 1 for a body click inside level 0', () => {
+    stack.ensureLevel(0);
+    stack.openFrom(document.getElementById('body'));
+    expect(drives).toEqual([{ level: 1, href: '/nest' }]);
+  });
+
+  it('drives level 0 for a footer click inside level 0', () => {
+    stack.ensureLevel(0);
+    stack.openFrom(document.getElementById('foot'));
+    expect(drives).toEqual([{ level: 0, href: '/step' }]);
+  });
+
+  it('truncates deeper levels before driving the target', () => {
+    stack.ensureLevel(2);
+    stack.openFrom(document.getElementById('host'));
+    expect(stack.levels.length).toBe(1);
+  });
+});

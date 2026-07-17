@@ -1,68 +1,59 @@
 /*!
- * Ajax Crud 
+ * Ajax Crud
  * =================================
  * Use for johnitvn/yii2-ajaxcrud extension
  * @author John Martin john.itvn@gmail.com
  */
 $(document).ready(function () {
 
-    // Create instance of Modal Remote
-    // This instance will be the controller of all business logic of modal
-    // Backwards compatible lookup of old ajaxCrubModal ID
-    if ($('#ajaxCrubModal').length > 0 && $('#ajaxCrudModal').length == 0) {
-        modal = new ModalRemote('#ajaxCrubModal');
-    } else {
-        modal = new ModalRemote('#ajaxCrudModal');
-    }
+    // One stack, not one modal. A modal-remote link clicked inside an open modal
+    // stacks a new level instead of destroying the one the user is standing in.
+    // Backwards compatible lookup of the old ajaxCrubModal ID.
+    var rootId = ($('#ajaxCrubModal').length > 0 && $('#ajaxCrudModal').length === 0)
+        ? '#ajaxCrubModal'
+        : '#ajaxCrudModal';
 
-    // Catch click event on all buttons that want to open a modal
+    var modalStack = new ModalStack(rootId);
+    window.modalStack = modalStack;
+
+    // Back-compat: `modal` is an implicit global that app views poke directly.
+    // Keep it pointing at level 0.
+    modal = modalStack.remoteFor(0);
+
     $(document).on('click', '[role="modal-remote"]', function (event) {
         event.preventDefault();
-
-        // Open modal
-        modal.open(this, null);
+        modalStack.openFrom(this, null);
     });
 
-    // Catch click event on all buttons that want to open a modal
-    // with bulk action
     $(document).on('click', '[role="modal-remote-bulk"]', function (event) {
         event.preventDefault();
 
-        // Collect all selected ID's
         var selectedIds = [];
-        
-        // See if we have a selector set
-        var selection = 'selection';
-        if ($(this).data("selector") != null) {
-        	selection = $(this).data("selector");
-        }
-        
+        var selection = $(this).data('selector') != null ? $(this).data('selector') : 'selection';
+
         $('input:checkbox[name="' + selection + '[]"]').each(function () {
-            if (this.checked)
-                selectedIds.push($(this).val());
+            if (this.checked) { selectedIds.push($(this).val()); }
         });
 
-        if (selectedIds.length == 0) {
-            // If no selected ID's show warning
-            modal.show();
-            modal.setTitle('No selection');
-            modal.setContent('You must select item(s) to use this action');
-            modal.addFooterButton("Close", 'btn btn-default', function (button, event) {
+        if (selectedIds.length === 0) {
+            var m = modalStack.remoteFor(modalStack.targetLevelFor(this));
+            m.show();
+            m.setTitle('No selection');
+            m.setContent('You must select item(s) to use this action');
+            m.addFooterButton('Close', 'button', 'btn btn-default', function () {
                 this.hide();
             });
-        } else {
-            // Open modal
-            modal.open(this, selectedIds);
+            return;
         }
+
+        modalStack.openFrom(this, selectedIds);
     });
 
     // Handle Pjax refresh on modal close
-    // Listen for hide event on modal to check for data-pjax-refresh attribute
-    $(document).on('hide.bs.modal', '.modal', function() {
-        // Check if any button in the modal has data-pjax-refresh attribute
+    $(document).on('hide.bs.modal', '.modal', function () {
         var pjaxRefreshId = $(this).find('[data-pjax-refresh]').data('pjax-refresh');
         if (pjaxRefreshId && typeof $.pjax !== 'undefined') {
-            $.pjax.reload({container: '#' + pjaxRefreshId, timeout: 2000});
+            $.pjax.reload({ container: '#' + pjaxRefreshId, timeout: 2000 });
         }
     });
 });

@@ -273,5 +273,61 @@
         return $host.length ? $host.first() : $();
     };
 
+    /**
+     * The ModalRemote driving `level`, constructing it if needed.
+     */
+    ModalStack.prototype.remoteFor = function (level) {
+        var entry = this.ensureLevel(level);
+        if (!entry.remote) {
+            entry.remote = new window.ModalRemote('#' + entry.$el.attr('id'));
+            entry.remote.modalLevel = level;
+            entry.remote.modalStack = this;
+        }
+        return entry.remote;
+    };
+
+    /**
+     * Bind a ModalRemote to `level` (once) and open `el`'s target in it.
+     */
+    ModalStack.prototype.driveLevel = function (level, el, bulkData) {
+        var entry = this.levels[level];
+        var stack = this;
+        var isNew = !entry.remote;
+        var remote = this.remoteFor(level);
+
+        if (isNew) {
+            entry.$el.on('shown.bs.modal', function () {
+                ModalStack.claimBackdrop(level);
+            });
+            entry.$el.on('hidden.bs.modal', function () {
+                var parent = stack.levels[level - 1];
+                if (parent) { ModalStack.restoreFocusTrap(parent.$el[0]); }
+            });
+        }
+
+        // Remember where this level came from, so a child that writes can refresh it.
+        entry.origin = {
+            url: $(el).attr('href') || $(el).attr('data-url'),
+            method: $(el).attr('data-request-method') || 'GET',
+            data: bulkData || null
+        };
+
+        remote.open(el, bulkData);
+    };
+
+    /**
+     * Entry point for a delegated [role="modal-remote"] click.
+     */
+    ModalStack.prototype.openFrom = function (el, bulkData) {
+        var target = this.targetLevelFor(el);
+
+        // Anything deeper than the target is unreachable now -- close it rather
+        // than leave it orphaned above the modal we are about to drive.
+        this.truncateAbove(target);
+        this.ensureLevel(target);
+
+        this.driveLevel(target, el, bulkData);
+    };
+
     window.ModalStack = ModalStack;
 }(window, window.jQuery));
