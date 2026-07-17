@@ -34,6 +34,18 @@ function ModalRemote(modalId) {
 
     this.loadingContent = '<div class="progress progress-striped active" style="margin-bottom:0;"><div class="progress-bar" style="width: 100%"></div></div>';
 
+    /**
+     * Find INSIDE this modal only.
+     *
+     * This object writes fixed ids (#ModalRemoteConfirmForm, #actionModalForm,
+     * #modal-error, #data-confirm-passcode-input) into whatever modal it drives.
+     * With more than one container on the page a document-wide $() resolves to
+     * whichever is first in DOM order -- i.e. the wrong level.
+     */
+    this.$find = function (selector) {
+        return $(this.modal).find(selector);
+    };
+
 
     /**
      * Show the modal
@@ -371,10 +383,17 @@ function ModalRemote(modalId) {
         /*Passcode Change*/
         
         
-        // Add form for user input if required
-        this.setContent('<form id="ModalRemoteConfirmForm" onsubmit="$(\'.modal-footer button[type=submit]\').click(); return false;">'+message+passwordConfirmText);
+        // Submit via THIS modal's footer button. The old global
+        // $('.modal-footer button[type=submit]') submitted the parent's form when
+        // this confirm was nested.
+        this.setContent('<form id="ModalRemoteConfirmForm">' + message + passwordConfirmText);
+        var confirmInstance = this;
+        this.$find('#ModalRemoteConfirmForm').on('submit', function (e) {
+            e.preventDefault();
+            $(confirmInstance.footer).find('button[type=submit]').first().click();
+        });
         if(validatePasscode){
-                setTimeout(function(){$('#data-confirm-passcode-input').focus();},500);
+                setTimeout(function(){confirmInstance.$find('#data-confirm-passcode-input').focus();},500);
         }
 
         var instance = this;
@@ -385,27 +404,27 @@ function ModalRemote(modalId) {
             function (e) {
                 var data;
                 /*Passcode Change*/
-                setTimeout(function(){$('#data-confirm-passcode-input').focus();},500);
+                setTimeout(function(){instance.$find('#data-confirm-passcode-input').focus();},500);
                 if(validatePasscode){
-                    if($('#data-confirm-passcode-input').val() == passcodeValue){
-                        $('#data-confirm-passcode').removeClass('is-invalid').removeClass('is-valid').addClass('is-valid');
-                        $('#data-confirm-passcode .invalid-feedback').html("Passcode validation Successful.").show();
+                    if(instance.$find('#data-confirm-passcode-input').val() == passcodeValue){
+                        instance.$find('#data-confirm-passcode').removeClass('is-invalid').removeClass('is-valid').addClass('is-valid');
+                        instance.$find('#data-confirm-passcode .invalid-feedback').html("Passcode validation Successful.").show();
                     } else {
-                        $('#data-confirm-passcode').removeClass('is-invalid').removeClass('is-valid').addClass('is-invalid');
-                        $('#data-confirm-passcode .invalid-feedback').html("Passcode validation failed.").show();
+                        instance.$find('#data-confirm-passcode').removeClass('is-invalid').removeClass('is-valid').addClass('is-invalid');
+                        instance.$find('#data-confirm-passcode .invalid-feedback').html("Passcode validation failed.").show();
                         return false;
                     }
                 }
                 /*Passcode Change*/
-                
+
                 // Test if browser supports FormData which handles uploads
                 if (window.FormData) {
-                    data = new FormData($('#ModalRemoteConfirmForm')[0]);
+                    data = new FormData(instance.$find('#ModalRemoteConfirmForm')[0]);
                     if (typeof selectedIds !== 'undefined' && selectedIds)
                         data.append('pks', selectedIds.join());
                 } else {
                     // Fallback to serialize
-                    data = $('#ModalRemoteConfirmForm');
+                    data = instance.$find('#ModalRemoteConfirmForm');
                     if (typeof selectedIds !== 'undefined' && selectedIds)
                         data.pks = selectedIds;
                     data = data.serializeArray();
@@ -537,7 +556,7 @@ function ModalRemote(modalId) {
                 var formData;
                 var jsonData = {};
 
-                formData = $('#actionModalForm').serializeArray();
+                formData = instance.$find('#actionModalForm').serializeArray();
                 formData.forEach(function(item) {
                     jsonData[item.name] = item.value;
                 });
@@ -560,7 +579,7 @@ function ModalRemote(modalId) {
             instance.addFooterButton('Submit', 'button', 'btn btn-primary', function (button, event) {
             if (config.successCallback !== undefined) {
                 var formData;
-                formData = $('#actionModalForm').serializeArray();
+                formData = instance.$find('#actionModalForm').serializeArray();
         
                 var jsonData = {};
                 formData.forEach(function(item) {
@@ -570,7 +589,7 @@ function ModalRemote(modalId) {
                 if(config.validateCallback !== undefined){
                     validateResponse = config.validateCallback(jsonData);
                     if(validateResponse !== true){
-                        $('#modal-error').html(validateResponse.message).show();
+                        instance.$find('#modal-error').html(validateResponse.message).show();
                         return;
                     }
                 } 
