@@ -234,6 +234,31 @@ function ModalRemote(modalId) {
     }
 
     /**
+     * Reload the grid a response's forceReload selector points at.
+     *
+     * Resolves nearest-first outward from THIS level rather than document-wide:
+     * ~245 controller responses emit the same '#crud-datatable-pjax', so a bare
+     * $() picks by DOM order and can reload a host-page grid instead of ours.
+     * No-op when the response carries no forceReload or no target exists.
+     */
+    function doForceReload(response) {
+        if (response.forceReload === undefined || !response.forceReload) {
+            return;
+        }
+        var reloadSelector = (response.forceReload == 'true')
+            ? '#crud-datatable-pjax'   // backwards compatible fixed target
+            : response.forceReload;
+
+        var $target = this.modalStack
+            ? this.modalStack.resolveReloadTarget(reloadSelector, this.modalLevel)
+            : $(reloadSelector).first();
+
+        if ($target.length > 0) {
+            $.pjax.reload({container: '#' + $target.attr('id'), timeout: 2000});
+        }
+    }
+
+    /**
      * When remote sends success response
      * @param {string} response
      */
@@ -254,31 +279,23 @@ function ModalRemote(modalId) {
             // The level below is now stale -- this write is the whole point of the
             // nested flow. Guarded inside refreshParentAfter: only on a real write,
             // and never over a parent form the user has typed into.
-            if (this.modalStack) {
-                this.modalStack.refreshParentAfter(this.modalLevel, response);
+            var parentRefreshed = this.modalStack
+                ? this.modalStack.refreshParentAfter(this.modalLevel, response)
+                : false;
+            // A parent refresh subsumes forceReload -- otherwise a child's save
+            // would fetch the same grid twice. But a TOP-LEVEL modal has no
+            // parent level (refreshParentAfter is a no-op), and forceClose +
+            // forceReload is the standard write response shape (every delete /
+            // settings action emits it) -- its host-page grid must still reload.
+            if (!parentRefreshed) {
+                doForceReload.call(this, response);
             }
             return;
         }
 
-        // Reload datatable if response contains a forceReload field. Skipped above
-        // when forceClose already triggered a wholesale parent refresh, which
-        // subsumes this -- otherwise a child's save would fetch the same grid twice.
-        if (response.forceReload !== undefined && response.forceReload) {
-            var reloadSelector = (response.forceReload == 'true')
-                ? '#crud-datatable-pjax'   // backwards compatible fixed target
-                : response.forceReload;
-
-            // Resolve nearest-first outward from THIS level rather than document-wide.
-            // ~245 responses emit the same '#crud-datatable-pjax', so a bare $()
-            // picks by DOM order and can reload a host-page grid instead of ours.
-            var $target = this.modalStack
-                ? this.modalStack.resolveReloadTarget(reloadSelector, this.modalLevel)
-                : $(reloadSelector).first();
-
-            if ($target.length > 0) {
-                $.pjax.reload({container: '#' + $target.attr('id'), timeout: 2000});
-            }
-        }
+        // Reload datatable if response contains a forceReload field (the
+        // modal-stays-open path, e.g. create's "Create More" success response).
+        doForceReload.call(this, response);
 
         if (response.size !== undefined)
             this.setSize(response.size);
